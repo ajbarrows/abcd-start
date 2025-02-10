@@ -24,13 +24,16 @@ execute:
 
  -->
 
-### Follow along at:
-
+::: {.callout-tip}
+## Follow along at
 
 https://ajbarrows.github.io/abcd-start/
+:::
 
 
-Load necessary libraries
+
+
+## Load necessary libraries
 
 ::: {.panel-tabset group="language"}
 # R
@@ -56,7 +59,7 @@ import seaborn as sns
 
 
 
-Read in curated dataset
+## Read in curated dataset
 
 ::: {.panel-tabset group="language"}
 # R
@@ -87,7 +90,7 @@ df.head()
 But... you're not always going to have a curated dataset...
 
 
-Sort out variable types
+## Sort out variable types
 
 ::: {.panel-tabset group="language"}
 # R
@@ -239,7 +242,6 @@ y = y[y['session_id'].isin(cumulative_timepoints)]
 
 Baseline "sips" and longitudinal sips are recorded in different variables. We'll add them together.
 
-
 ::: {.panel-tabset group="language"}
 # R
 ```{r}
@@ -303,7 +305,7 @@ y
 :::
 
 
-Put datasets back together
+## Put datasets back together
 
 ::: {.panel-tabset group="language"}
 # R
@@ -321,8 +323,7 @@ data.to_csv("../data/03_model_input/alcohol_model_input.csv", index=False)
 ```
 :::
 
-Fit a basic linear mixed effects model:
-
+ ## Fit a basic linear mixed effects model:
 
 ::: {.panel-tabset group="language"}
 # R
