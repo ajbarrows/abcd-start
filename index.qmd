@@ -290,8 +290,8 @@ Add together values from baseline through year 3
 ```{r}
 y <- y_pivot %>% 
   rowwise() %>% 
-  mutate(year3_sips = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
-  select(participant_id, year3_sips)
+  mutate(sips = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+  select(participant_id, sips)
 
 y
 ```
@@ -323,12 +323,12 @@ data.to_csv("../data/03_model_input/alcohol_model_input.csv", index=False)
 ```
 :::
 
- ## Fit a basic linear mixed effects model:
+## Fit a basic linear mixed effects model:
 
 ::: {.panel-tabset group="language"}
 # R
 ```{r}
-fm1 <- year3_sips ~ 
+fm1 <- sips ~ 
   mr_y_smri__vol__aseg__ag__lh_sum + 
   mr_y_smri__vol__aseg__ag__rh_sum +
   ab_p_demo__saab_001 +
@@ -355,5 +355,82 @@ sips ~ mr_y_smri__vol__aseg__ag__lh_sum +
 fit_1 = smf.mixedlm(fm1, data, groups=data['mr_y_adm__info__dev_serial'])
 fit_1 = fit_1.fit()
 print(fit_1.summary())
+```
+:::
+
+
+## Plot model fit
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+predictions = predict(fit_1)
+
+
+prediction_df <- data.frame(
+  predicted_sips = predictions,
+  actual_sips = data$sips,
+  amygdala_vol_left = data$mr_y_smri__vol__aseg__ag__lh_sum, 
+  amygdala_vol_right = data$mr_y_smri__vol__aseg__ag__rh_sum
+)
+
+# ggplot needs long-form data for faceting
+prediction_long <- prediction_df %>%
+  tidyr::pivot_longer(cols=c(amygdala_vol_left, amygdala_vol_right),
+                      names_to = 'hemisphere',
+                      values_to = 'volume')
+
+```
+# Python
+```{python}
+
+predictions = fit_1.predict(data)
+prediction_df = pd.DataFrame(
+    {
+        'predicted_sips': predictions,
+        'actual_sips': data['sips'],
+        'amygdala_vol_left': data['mr_y_smri__vol__aseg__ag__lh_sum'],
+        'amygdala_vol_right': data['mr_y_smri__vol__aseg__ag__rh_sum'],
+    }
+)
+```
+:::
+
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+ggplot(prediction_long, aes(x = volume)) +
+  geom_point(aes(y = actual_sips), color = 'blue') +
+  geom_line(aes(y = predicted_sips), color = 'red') +
+  facet_wrap(~hemisphere) +
+  theme_bw()
+```
+# Python
+```{python}
+fig, axs = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+
+for ax, hemisphere in zip(axs, ['left', 'right']):
+
+    ax.scatter(
+        prediction_df[f'amygdala_vol_{hemisphere}'], 
+        prediction_df['actual_sips'], 
+        label='Actual',
+        color='blue'
+    )
+
+    ax.set_title(f'Sips vs. {hemisphere.capitalize()} Amygdala Volume')
+    ax.set_xlabel(f'{hemisphere.capitalize()} Amygdala Volume')
+    ax.set_ylabel('Sips')
+
+    ax.plot(
+        prediction_df[f'amygdala_vol_{hemisphere}'], 
+        prediction_df['predicted_sips'], 
+        label='Predicted',
+        color='red'
+    )
+
+plt.legend()
+
 ```
 :::
