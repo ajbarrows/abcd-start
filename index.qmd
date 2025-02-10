@@ -1,0 +1,358 @@
+---
+title: "ABCD Demo Analysis"
+format:
+  html:
+    page-layout: full
+    df-print: paged
+editor: source
+theme: cosmo
+execute:
+  # eval: false
+  warning: false
+  message: false
+---
+
+
+<!-- ::: {.panel-tabset group="language"}
+# R
+```{r}
+```
+
+# Python
+```{python}
+```
+
+ -->
+
+### Follow along at:
+
+
+
+
+
+Load necessary libraries
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+library(dplyr)
+library(lme4)
+library(lmerTest)
+
+library(ggplot2)
+```
+# Python
+```{python}
+import pandas as pd
+import numpy as np
+
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+```
+:::
+
+
+
+Read in curated dataset
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+# watch out for periods in directory names...
+
+fpath <- '../data/02_intermediate/dataset.csv/dataset.csv' # you'll need to adjust file directories
+df <- read.csv(
+  fpath,
+  na.strings = c("NA", ' ', 999, 777) # blank spaces are missing data
+  )
+head(df)
+```
+
+
+# Python
+```{python}
+# watch out for periods in directory names...
+
+fpath = '../data/02_intermediate/dataset.csv/dataset.csv' # you'll need to adjust file directories
+
+df = pd.read_csv(fpath, na_values=['NA', ' ', 999, 777]) # blank spaces are missing data
+df.head()
+```
+:::
+
+
+But... you're not always going to have a curated dataset...
+
+
+Sort out variable types
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+# sort out variables, both to keep organized and arrange data types
+predictors <- c(
+  'mr_y_smri__vol__aseg__ag__lh_sum', # left amygdala vol
+  'mr_y_smri__vol__aseg__ag__rh_sum' # right amygdala vol
+)
+
+covariates <- c(
+  'ab_g_dyn__visit_age', # age
+  'ab_p_demo__saab_001', # sex
+  'ab_p_demo__income__hhold_001', # household income
+  # 'ph_y_pds__f_categ', # female puberty scale
+  # 'ph_y_pds__m_categ', # male puberty scale
+  'mr_y_adm__info__dev_serial' # scanner
+)
+
+targets <- c(
+  "su_y_lowuse__isip_001",
+  "su_y_lowuse__isip_001__l" # we'll sort this out later
+)
+
+id_vars <- c(
+  'participant_id',
+  'session_id'
+)
+
+predictor_timepoint <- 'ses-00A' # baseline
+target_timepoint <- 'ses-03A' # Year 3
+
+cumulative_timepoints <- c(
+  'ses-00A',
+  'ses-01A',
+  'ses-02A',
+  'ses-03A'
+)
+
+all_vars <- c(
+  id_vars,
+  predictors,
+  covariates,
+  targets
+)
+
+# peel off categorical variables
+categorical_list <- c(
+  'session_id',
+  'ab_p_demo__saab_001',
+  'ab_p_demo__income__hhold_001',
+  'mr_y_adm__info__dev_serial'
+  # 'ph_y_pds__f_categ',
+  # 'ph_y_pds__m_categ'
+)
+```
+
+# Python
+```{python}
+# sort out variables, both to keep organized and arrange data types
+predictors = [
+    'mr_y_smri__vol__aseg__ag__lh_sum', # left amygdala vol
+    'mr_y_smri__vol__aseg__ag__rh_sum' # right amygdala vol
+]
+
+covariates = [
+    'ab_g_dyn__visit_age', # age
+    'ab_p_demo__saab_001', # sex
+    'ab_p_demo__income__hhold_001', # household income
+    # 'ph_y_pds__f_categ', # female puberty scale
+    # 'ph_y_pds__m_categ', # male puberty scale
+    'mr_y_adm__info__dev_serial' # scanner
+]
+
+targets = [
+    "su_y_lowuse__isip_001",
+    "su_y_lowuse__isip_001__l" # we'll sort this out later
+]
+
+id_vars = [
+    'participant_id',
+    'session_id'
+]
+
+predictor_timepoint = 'ses-00A' # baseline
+target_timepoint = 'ses-03A' # Year 3
+
+cumulative_timepoints = [
+    'ses-00A',
+    'ses-01A',
+    'ses-02A',
+    'ses-03A'
+]
+
+all_vars = id_vars + predictors + covariates + targets
+
+# peel off categorical variables
+categorical_list = [
+    'session_id',
+    'ab_p_demo__saab_001',
+    'ab_p_demo__income__hhold_001',
+    'mr_y_adm__info__dev_serial'
+    # 'ph_y_pds__f_categ',
+    # 'ph_y_pds__m_categ'
+]
+
+```
+:::
+
+Need to do a few things:
+
+- Make a subset of the dataset using `all_vars`
+- Make sure categorical variables are represented as such using `categorical_list`
+- Construct a predictor dataset of baseline variables
+- Construct a target dataset of Year 3 variables
+- Combine longitudinal variables into one target
+
+::: {.panel-tabset group='language'}
+# R
+```{r}
+subset <- df %>% 
+  select(all_of(all_vars)) %>%
+  mutate(across(all_of(categorical_list), as.factor))
+
+# make predictor (baseline) dataset
+X <- subset %>% 
+  filter(session_id == predictor_timepoint) %>%
+  select(all_of(c(id_vars, predictors, covariates)))
+
+# make target (Year 3) dataset, filter for cumulative timepoints
+y <- subset %>%
+  filter(session_id %in% cumulative_timepoints) %>%
+  select(all_of(c(id_vars, targets)))
+```
+
+# Python
+```{python}
+subset = df[all_vars].copy()
+subset[categorical_list] = subset[categorical_list].astype('category')
+
+# make predictor (baseline) dataset
+X = subset[subset['session_id'] == predictor_timepoint][id_vars + predictors + covariates]
+
+# make target (Year 3) dataset, filter for cumulative timepoints
+y = subset[subset['session_id'].isin(cumulative_timepoints)][id_vars + targets]
+y = y[y['session_id'].isin(cumulative_timepoints)]
+```
+:::
+
+Baseline "sips" and longitudinal sips are recorded in different variables. We'll add them together.
+
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+y <- y %>%
+  rowwise() %>%
+  mutate(sips_combined = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+  select(all_of(id_vars), sips_combined)
+y
+```
+
+# Python
+```{python}
+y['sips_combined'] = np.sum(y[targets], axis=1)
+y = y.drop(targets, axis=1)
+y
+```
+:::
+
+Then we need to pivot this new variable to make a **cumulative** sips variable.
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+y_pivot <- y %>%
+  tidyr::pivot_wider(id_cols = 'participant_id',
+                     names_from = 'session_id',
+                     values_from = 'sips_combined')
+y_pivot
+```
+
+# Python
+```{python}
+y_pivot = pd.pivot(y, 
+                    index='participant_id', 
+                    columns='session_id', 
+                    values='sips_combined')
+y_pivot
+```
+:::
+
+Add together values from baseline through year 3
+
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+y <- y_pivot %>% 
+  rowwise() %>% 
+  mutate(year3_sips = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+  select(participant_id, year3_sips)
+
+y
+```
+
+# Python
+```{python}
+y_pivot['sips'] = np.sum(y_pivot[cumulative_timepoints], axis=1)
+y = y_pivot.drop(cumulative_timepoints, axis=1)
+y
+```
+:::
+
+
+Put datasets back together
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+data <- cbind(X, y)  %>% tidyr::drop_na() # drop all missing rows
+write.csv(data, "../data/03_model_input/alcohol_model_input.csv") # save to disk
+```
+
+# Python
+```{python}
+data = pd.concat([X.set_index('participant_id'), y], axis=1).reset_index()
+data = data.dropna()
+
+data.to_csv("../data/03_model_input/alcohol_model_input.csv", index=False)
+```
+:::
+
+Fit a basic linear mixed effects model:
+
+
+::: {.panel-tabset group="language"}
+# R
+```{r}
+fm1 <- year3_sips ~ 
+  mr_y_smri__vol__aseg__ag__lh_sum + 
+  mr_y_smri__vol__aseg__ag__rh_sum +
+  ab_p_demo__saab_001 +
+  ab_g_dyn__visit_age +
+  ab_p_demo__income__hhold_001 +
+  (1 | mr_y_adm__info__dev_serial)
+
+fit_1 <- lmer(fm1, data = data)
+summary(fit_1)
+
+```
+
+# Python
+```{python}
+fm1 = """
+sips ~ mr_y_smri__vol__aseg__ag__lh_sum + 
+    mr_y_smri__vol__aseg__ag__rh_sum + 
+    ab_p_demo__saab_001 + 
+    ab_g_dyn__visit_age + 
+    ab_p_demo__income__hhold_001
+"""
+
+# Fit the model
+fit_1 = smf.mixedlm(fm1, data, groups=data['mr_y_adm__info__dev_serial'])
+fit_1 = fit_1.fit()
+print(fit_1.summary())
+```
+:::
