@@ -7,7 +7,7 @@ format:
 editor: source
 theme: cosmo
 execute:
-  # eval: false
+  eval: false
   warning: false
   message: false
 ---
